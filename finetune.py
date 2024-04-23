@@ -65,7 +65,7 @@ def encode_all_items(model: RecformerModel, tokenizer: RecformerTokenizer, token
 
             outputs = model(**inputs)
 
-            item_embeddings.append(outputs.pooler_output.detach())
+            item_embeddings.append(outputs.pooler_output.dtach())
 
     item_embeddings = torch.cat(item_embeddings, dim=0)#.cpu()
 

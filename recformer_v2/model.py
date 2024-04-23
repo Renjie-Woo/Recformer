@@ -9,7 +9,7 @@ from recformer_v2.config import RecformerConfig, DEFAULT_CONFIG
 from recformer_v2.embedding import RecformerEmbedding
 from recformer_v2.pooler import RecformerPooler
 from typing import List, Union, Optional, Tuple
-
+from torch.nn import CrossEntropyLoss
 
 class RecformerModel(LongformerPreTrainedModel):
     def __init__(self, config: RecformerConfig = DEFAULT_CONFIG):
@@ -199,3 +199,95 @@ class RecformerModel(LongformerPreTrainedModel):
             attentions=encoder_outputs.attentions,
             global_attentions=encoder_outputs.global_attentions,
         )
+
+
+class Similarity(nn.Module):
+    """
+    Dot product or cosine similarity
+    """
+
+    def __init__(self, config: RecformerConfig):
+        super().__init__()
+        self.temp = config.temp
+        self.cos = nn.CosineSimilarity(dim=-1)
+
+    def forward(self, x, y):
+        return self.cos(x, y) / self.temp
+
+
+
+class RecformerForSeqRec(LongformerPreTrainedModel):
+    def __init__(self, config: RecformerConfig):
+        super().__init__(config)
+
+        self.longformer = RecformerModel(config)
+        self.sim = Similarity(config)
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def init_item_embedding(self, embeddings: Optional[torch.Tensor] = None):
+        self.item_embedding = nn.Embedding(num_embeddings=self.config.item_num, embedding_dim=self.config.hidden_size)
+        if embeddings is not None:
+            self.item_embedding = nn.Embedding.from_pretrained(embeddings, freeze=True)
+            print('Initalize item embeddings from vectors.')
+
+    def similarity_score(self, pooler_output, candidates=None):
+        if candidates is None:
+            candidate_embeddings = self.item_embedding.weight.unsqueeze(0) # (1, num_items, hidden_size)
+        else:
+            candidate_embeddings = self.item_embedding(candidates) # (batch_size, candidates, hidden_size)
+        pooler_output = pooler_output.unsqueeze(1) # (batch_size, 1, hidden_size)
+        return self.sim(pooler_output, candidate_embeddings)
+
+    def forward(self,
+                input_ids: Optional[torch.Tensor] = None,
+                attention_mask: Optional[torch.Tensor] = None,
+                global_attention_mask: Optional[torch.Tensor] = None,
+                head_mask: Optional[torch.Tensor] = None,
+                token_type_ids: Optional[torch.Tensor] = None,
+                position_ids: Optional[torch.Tensor] = None,
+                item_position_ids: Optional[torch.Tensor] = None,
+                inputs_embeds: Optional[torch.Tensor] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None,
+                candidates: Optional[torch.Tensor] = None, # candidate item ids
+                labels: Optional[torch.Tensor] = None, # target item ids
+                ):
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        batch_size = input_ids.size(0)
+
+        outputs = self.longformer(
+            input_ids,
+            attention_mask=attention_mask,
+            global_attention_mask=global_attention_mask,
+            head_mask=head_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            item_position_ids=item_position_ids,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=True,
+        )
+
+        pooler_output = outputs.pooler_output # (bs, hidden_size)
+
+        if labels is None:
+            return self.similarity_score(pooler_output, candidates)
+
+        loss_fct = CrossEntropyLoss()
+
+        if self.config.finetune_negative_sample_size<=0: ## using full softmax
+            logits = self.similarity_score(pooler_output)
+            loss = loss_fct(logits, labels)
+
+        else:  ## using sampled softmax
+            candidates = torch.cat((labels.unsqueeze(-1), torch.randint(0, self.config.item_num, size=(batch_size, self.config.finetune_negative_sample_size)).to(labels.device)), dim=-1)
+            logits = self.similarity_score(pooler_output, candidates)
+            target = torch.zeros_like(labels, device=labels.device)
+            loss = loss_fct(logits, target)
+
+        return loss
