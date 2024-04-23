@@ -14,15 +14,14 @@ def save_json(data, file_path):
         json.dump(data, wf)
 
 
-def get_train_data(seq):
+def get_train_data(seq, seq_data):
     seq_len = len(seq)
     start = min(0, seq_len)
     pos = random.randint(start, seq_len - 1)
-    return seq[:pos], [seq[pos]]
+    return (seq[:pos], [seq[pos]]), (seq_data[:pos], [seq_data[pos]])
 
 
 def load_data(dir):
-    import pdb; pdb.set_trace()
     train_path = os.path.join(dir, "train.json")
     val_path = os.path.join(dir, "val.json")
     test_path = os.path.join(dir, "test.json")
@@ -62,10 +61,11 @@ def load_data(dir):
 
     train_final = {}
     train_final_label = {}
+    train_final_label_id = {}
     for user_id in train_keys:
         seq = train_data[user_id]
         seq_data = parse_seq(seq, meta_data_with_item_id)
-        seq_input, seq_label = get_train_data(seq_data)
+        (_, seq_label_id), (seq_input, seq_label) = get_train_data(seq, seq_data)
         train_final[user_id] = {
             'input': seq_data
         }
@@ -73,8 +73,13 @@ def load_data(dir):
             "input": seq_input,
             "label": seq_label
         }
+        train_final_label_id[user_id] = {
+            "input": seq_input,
+            "label": seq_label_id
+        }
 
     val_final = {}
+    val_final_label_id = {}
     for user_id in val_keys:
         train_seq = train_data[user_id]
         val_seq = val_data[user_id]
@@ -82,8 +87,13 @@ def load_data(dir):
             "input": parse_seq(train_seq, meta_data_with_item_id),
             "label": parse_seq(val_seq, meta_data_with_item_id)
         }
+        val_final_label_id[user_id] = {
+            "input": parse_seq(train_seq, meta_data_with_item_id),
+            "label": val_seq
+        }
 
     test_final = {}
+    test_final_label_id = {}
     for user_id in test_keys:
         train_seq = train_data[user_id]
         test_seq = test_data[user_id]
@@ -91,12 +101,16 @@ def load_data(dir):
             "input": parse_seq(train_seq, meta_data_with_item_id),
             "label": parse_seq(test_seq, meta_data_with_item_id)
         }
+        test_final_label_id[user_id] = {
+            "input": parse_seq(train_seq, meta_data_with_item_id),
+            "label": test_seq
+        }
 
 
-    # save_json(train_final, "./Arts/train.json")
-    # save_json(val_final, "./Arts/val.json")
-    # save_json(test_final, "./Arts/test.json")
-    # save_json(train_final_label, "./Arts/train_with_label.json")
+    save_json(train_final_label_id, "./Arts/train_v1.json")
+    save_json(val_final_label_id, "./Arts/val_v1.json")
+    save_json(test_final_label_id, "./Arts/test_v1.json")
+    save_json(train_final_label, "./Arts/train_with_label.json")
     save_json(final_meta, "./Arts/meta.json")
 
 def parse_seq(item_id_seq, meta_map):
