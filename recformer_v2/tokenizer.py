@@ -159,7 +159,7 @@ class RecformerTokenizer(LongformerTokenizer):
             pad_len = max_len - len(input_ids)
 
             input_ids.extend([self.pad_token_id] * pad_len)
-            item_position_ids.extend([-1] * pad_len)
+            item_position_ids.extend([self.config.max_item_num - 1] * pad_len)
             token_type_ids.extend([TOKEN_TYPE_PAD] * pad_len)
             attention_mask.extend([0] * pad_len)
             global_attention_mask.extend([0] * pad_len)

@@ -10,7 +10,7 @@ val_path = "val.json"
 test_path = "test.json"
 
 tokenizer = RecformerTokenizer.from_pretrained("allenai/longformer-base-4096")
-
+print(tokenizer)
 
 def load_data(dir):
     train_data = read_json(os.path.join(dir, train_path), True)

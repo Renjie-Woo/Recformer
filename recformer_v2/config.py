@@ -4,8 +4,8 @@ from transformers.models.longformer.modeling_longformer import LongformerConfig
 # <s>, key, value, <pad>
 PRETRAINED_LONGFORMER = 'allenai/longformer-base-4096'
 DEFAULT_TOKEN_TYPE_SIZE = 4
-DEFAULT_MAX_TOKEN_NUM = 2048
-DEFAULT_MAX_ITEM_NUM = 64
+DEFAULT_MAX_TOKEN_NUM = 1024
+DEFAULT_MAX_ITEM_NUM = 51
 DEFAULT_MAX_ATTR_NUM = 3,
 DEFAULT_MAX_ATTR_LEN = 32
 
