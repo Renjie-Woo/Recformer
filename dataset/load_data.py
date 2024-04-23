@@ -113,6 +113,22 @@ def load_data(dir):
     save_json(train_final_label, "./Arts/train_with_label.json")
     save_json(final_meta, "./Arts/meta.json")
 
+def generate_demo():
+    index_list = [i for i in range(1024)]
+    train = read_json("./Arts/train_v1.json", True)
+    val = read_json("./Arts/val_v1.json", True)
+    test = read_json("./Arts/test_v1.json", True)
+
+    train_v2 = {}
+    val_v2 = {}
+    test_v2 = {}
+    for index in index_list:
+        train_v2[index] = train[index]
+        val_v2[index] = val[index]
+        test_v2[index] = test[index]
+    save_json(train_v2, "./Arts/train_demo.json")
+    save_json(val_v2, "./Arts/val_demo.json")
+    save_json(test_v2, "./Arts/test_demo.json")
 def parse_seq(item_id_seq, meta_map):
     item_seq = []
     for item_id in item_id_seq:
@@ -121,5 +137,6 @@ def parse_seq(item_id_seq, meta_map):
 
 
 if __name__ == '__main__':
-    dir = "./finetune_data_dataset/Arts"
-    load_data(dir)
+    # dir = "./finetune_data_dataset/Arts"
+    # load_data(dir)
+    generate_demo()
