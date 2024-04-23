@@ -9,16 +9,16 @@ DEFAULT_MAX_ITEM_NUM = 51
 DEFAULT_MAX_ATTR_NUM = 3,
 DEFAULT_MAX_ATTR_LEN = 32
 
-
 class RecformerConfig(LongformerConfig):
     def __init__(self,
+                 attention_window: Union[List[int], int] = 64,
+                 sep_token_id: int = 2,
                  max_token_num: int = DEFAULT_MAX_TOKEN_NUM,
                  max_item_num: int = DEFAULT_MAX_ITEM_NUM,
                  max_attr_num: int = DEFAULT_MAX_ATTR_NUM,
                  max_attr_len: int = DEFAULT_MAX_ATTR_LEN,
-                
-                 ):
-        super().__init__()
+                 **kwargs):
+        super().__init__(attention_window, sep_token_id, **kwargs)
 
         self.token_type_size = DEFAULT_TOKEN_TYPE_SIZE
         self.max_token_num = max_token_num ## max length of input sequence
@@ -26,9 +26,12 @@ class RecformerConfig(LongformerConfig):
         self.max_attr_num = max_attr_num  ## max number of attributes in an item
         self.max_attr_len = max_attr_len ## max length of an attribute
 
-    
 
-DEFAULT_CONFIG = RecformerConfig()
+DEFAULT_CONFIG = RecformerConfig.from_pretrained(PRETRAINED_LONGFORMER)
+DEFAULT_CONFIG.max_attr_num = 3
+DEFAULT_CONFIG.max_attr_length = 32
+DEFAULT_CONFIG.max_item_num = 51
+DEFAULT_CONFIG.max_token_num = 1024
 
 if __name__ == '__main__':
     print(DEFAULT_CONFIG)

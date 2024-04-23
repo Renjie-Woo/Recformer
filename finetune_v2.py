@@ -39,4 +39,5 @@ if __name__ == '__main__':
     for inputs, labels in train_loader:
         logits = model(**inputs)
         print(logits)
+        break
         
