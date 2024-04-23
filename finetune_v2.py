@@ -1,13 +1,16 @@
-from utils import read_json
+from utils import read_json, AverageMeterSet, Ranker
 import os
 from dataset.item_dataset import ItemDataset
 from torch.utils.data import DataLoader
 from recformer_v2.tokenizer import RecformerTokenizer
-from recformer_v2.model import RecformerModel
+from recformer_v2.model import RecformerModel, RecformerForSeqRec
+import torch
+from tqdm import tqdm
 
 train_path = "train_with_label.json"
 val_path = "val.json"
 test_path = "test.json"
+meta_path = "meta.json"
 
 tokenizer = RecformerTokenizer.from_pretrained("allenai/longformer-base-4096")
 print(tokenizer)
@@ -16,28 +19,155 @@ def load_data(dir):
     train_data = read_json(os.path.join(dir, train_path), True)
     val_data = read_json(os.path.join(dir, val_path), True)
     test_data = read_json(os.path.join(dir, test_path), True)
-
-    return train_data, val_data, test_data
+    meta_data = read_json(os.path.join(dir, meta_path), True)
+    return train_data, val_data, test_data, meta_data
 
 
 def generate_dataloader(dir):
-    train_data, val_data, test_data = load_data(dir)
+    train_data, val_data, test_data, meta_data = load_data(dir)
     train_dataset = ItemDataset(train_data, tokenizer)
     val_dataset = ItemDataset(val_data, tokenizer)
     test_dataset = ItemDataset(test_data, tokenizer)
+    meta_dataset = ItemDataset(meta_data, tokenizer)
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, collate_fn=train_dataset.collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=True, collate_fn=val_dataset.collate_fn)
     test_loader = DataLoader(test_dataset, batch_size=8, shuffle=True, collate_fn=test_dataset.collate_fn)
-    return train_loader, val_loader, test_loader
+    meta_loader = DataLoader(meta_dataset, batch_size=32, shuffle=False)
+    return train_loader, val_loader, test_loader, meta_loader
 
-    
+def encode_all_items(model, dataloader):
+    model.eval()
 
+    item_embeddings = []
+    with torch.no_grad():
+        for inputs, labels in tqdm(dataloader):
+            outputs = model(**inputs)
+
+            item_embeddings.append(outputs.pooler_output.detach())
+
+    item_embeddings = torch.cat(item_embeddings, dim=0)#.cpu()
+
+    return item_embeddings
+
+def eval(model, dataloader):
+
+    model.eval()
+
+    ranker = Ranker([10,50])
+    average_meter_set = AverageMeterSet()
+
+    for batch, labels in tqdm(dataloader, ncols=100, desc='Evaluate'):
+
+        for k, v in batch.items():
+            batch[k] = v
+        labels = labels
+
+        with torch.no_grad():
+            scores = model(**batch)
+
+        res = ranker(scores, labels)
+
+        metrics = {}
+        for i, k in enumerate([10, 50]):
+            metrics["NDCG@%d" % k] = res[2*i]
+            metrics["Recall@%d" % k] = res[2*i+1]
+        metrics["MRR"] = res[-3]
+        metrics["AUC"] = res[-2]
+
+        for k, v in metrics.items():
+            average_meter_set.update(k, v)
+
+    average_metrics = average_meter_set.averages()
+
+    return average_metrics
 
 if __name__ == '__main__':
-    model = RecformerModel()
-    train_loader, _, _ = generate_dataloader('./dataset/Arts')
-    for inputs, labels in train_loader:
-        logits = model(**inputs)
-        print(logits)
-        break
-        
+    train_loader, val_loader, test_loader, meta_loader = generate_dataloader('./dataset/Arts')
+
+    pretrain_ckpt = ""
+
+    model = RecformerForSeqRec()
+    pretrain_ckpt = torch.load(pretrain_ckpt)
+    model.load_state_dict(pretrain_ckpt, strict=False)
+
+    for param in model.longformer.embeddings.word_embeddings.parameters():
+        param.requires_grad = False
+
+    # path_item_embeddings = dir_preprocess / f'item_embeddings_{path_corpus.name}'
+    # if path_item_embeddings.exists():
+    #     print(f'[Item Embeddings] Use cache: {path_tokenized_items}')
+    # else:
+    #     print(f'Encoding items.')
+    #     item_embeddings = encode_all_items(model.longformer, tokenizer, tokenized_items, args)
+    #     torch.save(item_embeddings, path_item_embeddings)
+    #
+    # item_embeddings = torch.load(path_item_embeddings)
+    item_embeddings = encode_all_items(model.longformer, meta_loader)
+
+    model.init_item_embedding(item_embeddings)
+
+    # num_train_optimization_steps = int(len(train_loader) / args.gradient_accumulation_steps) * args.num_train_epochs
+    # optimizer, scheduler = create_optimizer_and_scheduler(model, num_train_optimization_steps, args)
+    #
+    # if args.fp16:
+    #     scaler = torch.cuda.amp.GradScaler()
+    # else:
+    #     scaler = None
+
+    test_metrics = eval(model, test_loader)
+    print(f'Test set: {test_metrics}')
+
+    best_target = float('-inf')
+    patient = 5
+
+    for epoch in range(500):
+
+        item_embeddings = encode_all_items(model.longformer, meta_loader)
+        model.init_item_embedding(item_embeddings)
+
+    #     train_one_epoch(model, train_loader, optimizer, scheduler, scaler, args)
+    #
+    #     if (epoch + 1) % args.verbose == 0:
+    #         dev_metrics = eval(model, dev_loader, args)
+    #         print(f'Epoch: {epoch}. Dev set: {dev_metrics}')
+    #
+    #         if dev_metrics['NDCG@10'] > best_target:
+    #             print('Save the best model.')
+    #             best_target = dev_metrics['NDCG@10']
+    #             patient = 5
+    #             torch.save(model.state_dict(), path_ckpt)
+    #
+    #         else:
+    #             patient -= 1
+    #             if patient == 0:
+    #                 break
+    #
+    # print('Load best model in stage 1.')
+    # model.load_state_dict(torch.load(path_ckpt))
+    #
+    # patient = 3
+    #
+    # for epoch in range(args.num_train_epochs):
+    #
+    #     train_one_epoch(model, train_loader, optimizer, scheduler, scaler, args)
+    #
+    #     if (epoch + 1) % args.verbose == 0:
+    #         dev_metrics = eval(model, dev_loader, args)
+    #         print(f'Epoch: {epoch}. Dev set: {dev_metrics}')
+    #
+    #         if dev_metrics['NDCG@10'] > best_target:
+    #             print('Save the best model.')
+    #             best_target = dev_metrics['NDCG@10']
+    #             patient = 3
+    #             torch.save(model.state_dict(), path_ckpt)
+    #
+    #         else:
+    #             patient -= 1
+    #             if patient == 0:
+    #                 break
+    #
+    # print('Test with the best checkpoint.')
+    # model.load_state_dict(torch.load(path_ckpt))
+    # test_metrics = eval(model, test_loader, args)
+    # print(f'Test set: {test_metrics}')
+    #

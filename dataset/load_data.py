@@ -49,10 +49,15 @@ def load_data(dir):
     # print(demo)
 
     meta_data_with_item_id = {}
+    final_meta = {}
     for asin in smap_data:
         item_id = smap_data[asin]
         item_info = meta_data[asin]
         meta_data_with_item_id[item_id] = item_info
+        final_meta[item_id] = {
+            "input": [item_info],
+            "label": []
+        }
 
     train_final = {}
     train_final_label = {}
@@ -86,11 +91,12 @@ def load_data(dir):
             "label": parse_seq(test_seq, meta_data_with_item_id)
         }
 
-    save_json(train_final, "./Arts/train.json")
-    save_json(val_final, "./Arts/val.json")
-    save_json(test_final, "./Arts/test.json")
-    save_json(train_final_label, "./Arts/train_with_label.json")
 
+    # save_json(train_final, "./Arts/train.json")
+    # save_json(val_final, "./Arts/val.json")
+    # save_json(test_final, "./Arts/test.json")
+    # save_json(train_final_label, "./Arts/train_with_label.json")
+    save_json(final_meta, "./Arts/meta.json")
 
 def parse_seq(item_id_seq, meta_map):
     item_seq = []

@@ -217,7 +217,7 @@ class Similarity(nn.Module):
 
 
 class RecformerForSeqRec(LongformerPreTrainedModel):
-    def __init__(self, config: RecformerConfig):
+    def __init__(self, config: RecformerConfig=DEFAULT_CONFIG):
         super().__init__(config)
 
         self.longformer = RecformerModel(config)
