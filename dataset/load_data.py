@@ -86,9 +86,9 @@ def load_data(dir):
             "label": parse_seq(test_seq, meta_data_with_item_id)
         }
 
-    # save_json(train_final, "./Arts/train.json")
-    # save_json(val_final, "./Arts/val.json")
-    # save_json(test_final, "./Arts/test.json")
+    save_json(train_final, "./Arts/train.json")
+    save_json(val_final, "./Arts/val.json")
+    save_json(test_final, "./Arts/test.json")
     save_json(train_final_label, "./Arts/train_with_label.json")
 
 

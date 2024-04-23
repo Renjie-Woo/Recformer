@@ -1,24 +1,17 @@
-from transformers.models.longformer.modeling_longformer import LongformerPreTrainedModel
+import torch
+import torch.nn as nn
+from transformers.models.longformer.modeling_longformer import (
+    LongformerPreTrainedModel,
+    LongformerEncoder,
+    LongformerBaseModelOutputWithPooling
+)
 from recformer_v2.config import RecformerConfig, DEFAULT_CONFIG
 from recformer_v2.embedding import RecformerEmbedding
+from recformer_v2.pooler import RecformerPooler
+
 
 class RecformerModel(LongformerPreTrainedModel):
-    """
-    This class copied code from [`RobertaModel`] and overwrote standard self-attention with longformer self-attention
-    to provide the ability to process long sequences following the self-attention approach described in [Longformer:
-    the Long-Document Transformer](https://arxiv.org/abs/2004.05150) by Iz Beltagy, Matthew E. Peters, and Arman Cohan.
-    Longformer self-attention combines a local (sliding window) and global attention to extend to long documents
-    without the O(n^2) increase in memory and compute.
-
-    The self-attention module `LongformerSelfAttention` implemented here supports the combination of local and global
-    attention but it lacks support for autoregressive attention and dilated attention. Autoregressive and dilated
-    attention are more relevant for autoregressive language modeling than finetuning on downstream tasks. Future
-    release will add support for autoregressive attention, but the support for dilated attention requires a custom CUDA
-    kernel to be memory and compute efficient.
-
-    """
-
-    def __init__(self, config: RecformerConfig = DEFAULT_CONFIG, add_pooling_layer=True):
+    def __init__(self, config: RecformerConfig = DEFAULT_CONFIG):
         super().__init__(config)
         self.config = config
 
@@ -34,7 +27,7 @@ class RecformerModel(LongformerPreTrainedModel):
 
         self.embeddings = RecformerEmbedding(config)
         self.encoder = LongformerEncoder(config)
-        self.pooler = LongformerPooler(config) if add_pooling_layer else None
+        self.pooler = RecformerPooler()
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -58,6 +51,7 @@ class RecformerModel(LongformerPreTrainedModel):
             input_ids: torch.Tensor,
             attention_mask: torch.Tensor,
             token_type_ids: torch.Tensor,
+            item_position_ids: torch.Tensor,
             position_ids: torch.Tensor,
             inputs_embeds: torch.Tensor,
             pad_token_id: int,
@@ -78,12 +72,14 @@ class RecformerModel(LongformerPreTrainedModel):
 
         # this path should be recorded in the ONNX export, it is fine with padding_len == 0 as well
         if padding_len > 0:
-            logger.warning_once(
-                f"Input ids are automatically padded from {seq_len} to {seq_len + padding_len} to be a multiple of "
-                f"`config.attention_window`: {attention_window}"
-            )
+            # logger.warning_once(
+            #     f"Input ids are automatically padded from {seq_len} to {seq_len + padding_len} to be a multiple of "
+            #     f"`config.attention_window`: {attention_window}"
+            # )
             if input_ids is not None:
                 input_ids = nn.functional.pad(input_ids, (0, padding_len), value=pad_token_id)
+            if item_position_ids is not None:
+                item_position_ids = nn.functional.pad(item_position_ids, (0, padding_len), value=pad_token_id)
             if position_ids is not None:
                 # pad with position_id = pad_token_id as in modeling_roberta.RobertaEmbeddings
                 position_ids = nn.functional.pad(position_ids, (0, padding_len), value=pad_token_id)
@@ -101,7 +97,7 @@ class RecformerModel(LongformerPreTrainedModel):
             )  # no attention on the padding tokens
             token_type_ids = nn.functional.pad(token_type_ids, (0, padding_len), value=0)  # pad with token_type_id = 0
 
-        return padding_len, input_ids, attention_mask, token_type_ids, position_ids, inputs_embeds
+        return padding_len, input_ids, attention_mask, token_type_ids, item_position_ids, position_ids, inputs_embeds
 
     def _merge_to_attention_mask(self, attention_mask: torch.Tensor, global_attention_mask: torch.Tensor):
         # longformer self attention expects attention mask to have 0 (no attn), 1 (local attn), 2 (global attn)
@@ -115,8 +111,8 @@ class RecformerModel(LongformerPreTrainedModel):
             attention_mask = global_attention_mask + 1
         return attention_mask
 
-    @add_start_docstrings_to_model_forward(LONGFORMER_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
-    @replace_return_docstrings(output_type=LongformerBaseModelOutputWithPooling, config_class=_CONFIG_FOR_DOC)
+    # @add_start_docstrings_to_model_forward(LONGFORMER_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    # @replace_return_docstrings(output_type=LongformerBaseModelOutputWithPooling, config_class=_CONFIG_FOR_DOC)
     def forward(
             self,
             input_ids: Optional[torch.Tensor] = None,
@@ -124,50 +120,13 @@ class RecformerModel(LongformerPreTrainedModel):
             global_attention_mask: Optional[torch.Tensor] = None,
             head_mask: Optional[torch.Tensor] = None,
             token_type_ids: Optional[torch.Tensor] = None,
+            item_position_ids: Optional[torch.Tensor] = None,
             position_ids: Optional[torch.Tensor] = None,
             inputs_embeds: Optional[torch.Tensor] = None,
             output_attentions: Optional[bool] = None,
             output_hidden_states: Optional[bool] = None,
             return_dict: Optional[bool] = None,
     ) -> Union[Tuple, LongformerBaseModelOutputWithPooling]:
-        r"""
-
-        Returns:
-
-        Examples:
-
-        ```python
-        >>> import torch
-        >>> from transformers import LongformerModel, AutoTokenizer
-
-        >>> model = LongformerModel.from_pretrained("allenai/longformer-base-4096")
-        >>> tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-base-4096")
-
-        >>> SAMPLE_TEXT = " ".join(["Hello world! "] * 1000)  # long input document
-        >>> input_ids = torch.tensor(tokenizer.encode(SAMPLE_TEXT)).unsqueeze(0)  # batch of size 1
-
-        >>> attention_mask = torch.ones(
-        ...     input_ids.shape, dtype=torch.long, device=input_ids.device
-        ... )  # initialize to local attention
-        >>> global_attention_mask = torch.zeros(
-        ...     input_ids.shape, dtype=torch.long, device=input_ids.device
-        ... )  # initialize to global attention to be deactivated for all tokens
-        >>> global_attention_mask[
-        ...     :,
-        ...     [
-        ...         1,
-        ...         4,
-        ...         21,
-        ...     ],
-        ... ] = 1  # Set global attention to random tokens for the sake of this example
-        >>> # Usually, set global attention based on the task. For example,
-        >>> # classification: the <s> token
-        >>> # QA: question tokens
-        >>> # LM: potentially on the beginning of sentences and paragraphs
-        >>> outputs = model(input_ids, attention_mask=attention_mask, global_attention_mask=global_attention_mask)
-        >>> sequence_output = outputs.last_hidden_state
-        >>> pooled_output = outputs.pooler_output
-        ```"""
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -178,7 +137,7 @@ class RecformerModel(LongformerPreTrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
+            # self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
             input_shape = input_ids.size()
         elif inputs_embeds is not None:
             input_shape = inputs_embeds.size()[:-1]
@@ -196,10 +155,11 @@ class RecformerModel(LongformerPreTrainedModel):
         if global_attention_mask is not None:
             attention_mask = self._merge_to_attention_mask(attention_mask, global_attention_mask)
 
-        padding_len, input_ids, attention_mask, token_type_ids, position_ids, inputs_embeds = self._pad_to_window_size(
+        padding_len, input_ids, attention_mask, token_type_ids, item_position_ids, position_ids, inputs_embeds = self._pad_to_window_size(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
+            item_position_ids=item_position_ids,
             position_ids=position_ids,
             inputs_embeds=inputs_embeds,
             pad_token_id=self.config.pad_token_id,
@@ -212,7 +172,8 @@ class RecformerModel(LongformerPreTrainedModel):
                                                 ]
 
         embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
+            input_ids=input_ids, position_ids=position_ids, item_position_ids=item_position_ids,
+            token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
         )
 
         encoder_outputs = self.encoder(
