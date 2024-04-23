@@ -18,7 +18,7 @@ class ItemDataset(Dataset):
     def collate_fn(self, batch_data):
         inputs = [data['input'] for data in batch_data]
         labels = [data['label'] for data in batch_data]
-        tokenized_inputs = self.tokenizer(inputs)
-        tokenized_labels = self.tokenizer(labels)
+        tokenized_inputs = self.tokenizer(inputs, return_tensor=True)
+        tokenized_labels = self.tokenizer(labels, return_tensor=True)
         return tokenized_inputs, tokenized_labels
 

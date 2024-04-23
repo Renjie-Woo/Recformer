@@ -8,6 +8,7 @@ from transformers.models.longformer.modeling_longformer import (
 from recformer_v2.config import RecformerConfig, DEFAULT_CONFIG
 from recformer_v2.embedding import RecformerEmbedding
 from recformer_v2.pooler import RecformerPooler
+from typing import List, Union, Optional, Tuple
 
 
 class RecformerModel(LongformerPreTrainedModel):

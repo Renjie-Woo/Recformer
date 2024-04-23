@@ -3,6 +3,7 @@ import os
 from dataset.item_dataset import ItemDataset
 from torch.utils.data import DataLoader
 from recformer_v2.tokenizer import RecformerTokenizer
+from recformer_v2.model import RecformerModel
 
 train_path = "train_with_label.json"
 val_path = "val.json"
@@ -29,12 +30,13 @@ def generate_dataloader(dir):
     test_loader = DataLoader(test_dataset, batch_size=8, shuffle=True, collate_fn=test_dataset.collate_fn)
     return train_loader, val_loader, test_loader
 
+    
+
 
 if __name__ == '__main__':
-
+    model = RecformerModel()
     train_loader, _, _ = generate_dataloader('./dataset/Arts')
     for inputs, labels in train_loader:
-        print(inputs)
-        print('----')
-        print(labels)
-        break
+        logits = model(**inputs)
+        print(logits)
+        
