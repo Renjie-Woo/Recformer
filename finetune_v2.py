@@ -9,12 +9,12 @@ import torch
 from tqdm import tqdm
 from torch.cuda.amp import autocast
 
-train_path = "train_with_label.json"
-val_path = "val.json"
-test_path = "test.json"
+train_path = "train_v1.json"
+val_path = "val_v1.json"
+test_path = "test_v1.json"
 meta_path = "meta.json"
 
-device = torch.device('cuda:{}'.format('1')) if 1>=0 else torch.device('cpu')
+device = torch.device('cuda:1')#torch.device('cuda:{}'.format('0')) if 1>=0 else torch.device('cpu')
 print(device)
 fp16 = True
 verbose = 3
@@ -40,10 +40,10 @@ def generate_dataloader(dir):
     val_dataset = ItemDataset(val_data, tokenizer)
     test_dataset = ItemDataset(test_data, tokenizer)
     meta_dataset = ItemDataset(meta_data, tokenizer)
-    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, collate_fn=train_dataset.collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=4, shuffle=True, collate_fn=val_dataset.collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=4, shuffle=True, collate_fn=test_dataset.collate_fn)
-    meta_loader = DataLoader(meta_dataset, batch_size=4, shuffle=False, collate_fn=meta_dataset.collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=train_dataset.collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=True, collate_fn=val_dataset.collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True, collate_fn=test_dataset.collate_fn)
+    meta_loader = DataLoader(meta_dataset, batch_size=16, shuffle=False, collate_fn=meta_dataset.collate_fn)
     return train_loader, val_loader, test_loader, meta_loader
 
 def encode_all_items(model, dataloader):
@@ -154,9 +154,10 @@ if __name__ == '__main__':
     #     torch.save(item_embeddings, path_item_embeddings)
     #
     # item_embeddings = torch.load(path_item_embeddings)
-    item_embeddings = encode_all_items(model.longformer, meta_loader)
-    torch.save(item_embeddings, './item_embeddings.pt')
-
+    #item_embeddings = encode_all_items(model.longformer, meta_loader)
+    #torch.save(item_embeddings, './item_embeddings.pt')
+    item_embeddings = torch.load('./item_embeddings.pt')
+    print('load item embeddings from local')
     model.init_item_embedding(item_embeddings)
 
     num_train_optimization_steps = int(len(train_loader) / gradient_accumulation_steps) * num_train_epochs

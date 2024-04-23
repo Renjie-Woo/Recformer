@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset
-
+import torch
 
 class ItemDataset(Dataset):
 
@@ -19,6 +19,6 @@ class ItemDataset(Dataset):
         inputs = [data['input'] for data in batch_data]
         labels = [data['label'] for data in batch_data]
         tokenized_inputs = self.tokenizer(inputs, return_tensor=True)
-        tokenized_labels = self.tokenizer(labels, return_tensor=True)
+        tokenized_labels = torch.LongTensor(labels).to(self.tokenizer.device)#self.tokenizer(labels, return_tensor=True)
         return tokenized_inputs, tokenized_labels
 
