@@ -2,7 +2,9 @@ from torch.optim import AdamW
 import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
 
-
+weight_decay = 0
+learning_rate = 5e-5
+warmup_steps = 100
 
 def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
     """ Create a schedule with a learning rate that decreases linearly after
@@ -20,16 +22,16 @@ def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
 
 
 
-def create_optimizer_and_scheduler(model: nn.Module, num_train_optimization_steps, args):
+def create_optimizer_and_scheduler(model: nn.Module, num_train_optimization_steps):
     
     param_optimizer = list(model.named_parameters())
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': weight_decay},
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
 
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=num_train_optimization_steps)
+    optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate)
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=num_train_optimization_steps)
 
     return optimizer, scheduler

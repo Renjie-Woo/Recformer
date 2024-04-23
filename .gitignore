@@ -5,3 +5,4 @@
 /dataset/__pycache__
 /recformer_v2/__pycache__
 __pycache__
+item_embeddings.pt

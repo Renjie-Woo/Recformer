@@ -39,6 +39,9 @@ class RecformerTokenizer(LongformerTokenizer):
     def from_pretrained(cls, pretrained_model_name_or_path):
         cls.config = DEFAULT_CONFIG
         return super().from_pretrained(pretrained_model_name_or_path)
+    
+    def add_device(self, device):
+        self.device = device
 
     def __call__(self, items, pad_to_max=False, return_tensor=False):
         if items is None:
@@ -55,7 +58,7 @@ class RecformerTokenizer(LongformerTokenizer):
 
         if return_tensor:
             for k,v in result.items():
-                result[k] = torch.LongTensor(v)
+                result[k] = torch.LongTensor(v).to(self.device)
         return result
 
     def set_config(self, config=DEFAULT_CONFIG):

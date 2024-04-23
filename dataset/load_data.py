@@ -22,6 +22,7 @@ def get_train_data(seq):
 
 
 def load_data(dir):
+    import pdb; pdb.set_trace()
     train_path = os.path.join(dir, "train.json")
     val_path = os.path.join(dir, "val.json")
     test_path = os.path.join(dir, "test.json")
