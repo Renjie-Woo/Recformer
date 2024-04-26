@@ -18,14 +18,13 @@ from dataloader import RecformerTrainDataset, RecformerEvalDataset
 
 
 def load_data(args):
-
     train = read_json(os.path.join(args.data_path, args.train_file), True)
     val = read_json(os.path.join(args.data_path, args.dev_file), True)
     test = read_json(os.path.join(args.data_path, args.test_file), True)
     item_meta_dict = json.load(open(os.path.join(args.data_path, args.meta_file)))
-    
+
     item2id = read_json(os.path.join(args.data_path, args.item2id_file))
-    id2item = {v:k for k, v in item2id.items()}
+    id2item = {v: k for k, v in item2id.items()}
 
     item_meta_dict_filted = dict()
     for k, v in item_meta_dict.items():
@@ -36,16 +35,17 @@ def load_data(args):
 
 
 tokenizer_glb: RecformerTokenizer = None
+
+
 def _par_tokenize_doc(doc):
-    
     item_id, item_attr = doc
 
     input_ids, token_type_ids = tokenizer_glb.encode_item(item_attr)
 
     return item_id, input_ids, token_type_ids
 
-def encode_all_items(model: RecformerModel, tokenizer: RecformerTokenizer, tokenized_items, args):
 
+def encode_all_items(model: RecformerModel, tokenizer: RecformerTokenizer, tokenized_items, args):
     model.eval()
 
     items = sorted(list(tokenized_items.items()), key=lambda x: x[0])
@@ -56,7 +56,7 @@ def encode_all_items(model: RecformerModel, tokenizer: RecformerTokenizer, token
     with torch.no_grad():
         for i in tqdm(range(0, len(items), args.batch_size), ncols=100, desc='Encode all items'):
 
-            item_batch = [[item] for item in items[i:i+args.batch_size]]
+            item_batch = [[item] for item in items[i:i + args.batch_size]]
 
             inputs = tokenizer.batch_encode(item_batch, encode_item=False)
 
@@ -67,13 +67,12 @@ def encode_all_items(model: RecformerModel, tokenizer: RecformerTokenizer, token
 
             item_embeddings.append(outputs.pooler_output.detach())
 
-    item_embeddings = torch.cat(item_embeddings, dim=0)#.cpu()
+    item_embeddings = torch.cat(item_embeddings, dim=0)  # .cpu()
 
     return item_embeddings
 
 
 def eval(model, dataloader, args):
-
     model.eval()
 
     ranker = Ranker(args.metric_ks)
@@ -92,8 +91,8 @@ def eval(model, dataloader, args):
 
         metrics = {}
         for i, k in enumerate(args.metric_ks):
-            metrics["NDCG@%d" % k] = res[2*i]
-            metrics["Recall@%d" % k] = res[2*i+1]
+            metrics["NDCG@%d" % k] = res[2 * i]
+            metrics["Recall@%d" % k] = res[2 * i + 1]
         metrics["MRR"] = res[-3]
         metrics["AUC"] = res[-2]
 
@@ -104,8 +103,8 @@ def eval(model, dataloader, args):
 
     return average_metrics
 
-def train_one_epoch(model, dataloader, optimizer, scheduler, scaler, args):
 
+def train_one_epoch(model, dataloader, optimizer, scheduler, scaler, args):
     model.train()
 
     for step, batch in enumerate(tqdm(dataloader, ncols=100, desc='Training')):
@@ -145,6 +144,7 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, scaler, args):
                 optimizer.step()
                 optimizer.zero_grad()
 
+
 def main():
     parser = ArgumentParser()
     # path and file
@@ -160,7 +160,8 @@ def main():
     parser.add_argument('--meta_file', type=str, default='meta_data.json')
 
     # data process
-    parser.add_argument('--preprocessing_num_workers', type=int, default=8, help="The number of processes to use for the preprocessing.")
+    parser.add_argument('--preprocessing_num_workers', type=int, default=8,
+                        help="The number of processes to use for the preprocessing.")
     parser.add_argument('--dataloader_num_workers', type=int, default=0)
 
     # model
@@ -179,25 +180,28 @@ def main():
     parser.add_argument('--fp16', action='store_true')
     parser.add_argument('--fix_word_embedding', action='store_true')
     parser.add_argument('--verbose', type=int, default=3)
-    
+    parser.add_argument('--max_item_num', type=int, default=51)
 
     args = parser.parse_args()
+    args.ckpt = args.ckpt.replace('best_model', f'best_model_min{args.max_item_num}')
+
     print(args)
     seed_everything(42)
-    args.device = torch.device('cuda:{}'.format(args.device)) if args.device>=0 else torch.device('cpu')
+    args.device = torch.device('cuda:0')  # ('cuda:{}'.format(args.device)) if args.device>=0 else torch.device('cpu')
 
     train, val, test, item_meta_dict, item2id, id2item = load_data(args)
 
     config = RecformerConfig.from_pretrained(args.model_name_or_path)
     config.max_attr_num = 3
     config.max_attr_length = 32
-    config.max_item_embeddings = 51
+    config.max_item_embeddings = args.max_item_num  # 51
+    print(f'max item is set to {args.max_item_num}')
     config.attention_window = [64] * 12
-    config.max_token_num = 1024
+    config.max_token_num = 512
     config.item_num = len(item2id)
     config.finetune_negative_sample_size = args.finetune_negative_sample_size
     tokenizer = RecformerTokenizer.from_pretrained(args.model_name_or_path, config)
-    
+
     global tokenizer_glb
     tokenizer_glb = tokenizer
 
@@ -218,10 +222,11 @@ def main():
         pool = Pool(processes=args.preprocessing_num_workers)
         pool_func = pool.imap(func=_par_tokenize_doc, iterable=item_meta_dict.items())
         doc_tuples = list(tqdm(pool_func, total=len(item_meta_dict), ncols=100, desc=f'[Tokenize] {path_corpus}'))
-        tokenized_items = {item2id[item_id]: [input_ids, token_type_ids] for item_id, input_ids, token_type_ids in doc_tuples}
+        tokenized_items = {item2id[item_id]: [input_ids, token_type_ids] for item_id, input_ids, token_type_ids in
+                           doc_tuples}
         pool.close()
         pool.join()
-
+        print(path_tokenized_items)
         torch.save(tokenized_items, path_tokenized_items)
 
     tokenized_items = torch.load(path_tokenized_items)
@@ -234,17 +239,16 @@ def main():
     val_data = RecformerEvalDataset(train, val, test, mode='val', collator=eval_data_collator)
     test_data = RecformerEvalDataset(train, val, test, mode='test', collator=eval_data_collator)
 
-    
-    train_loader = DataLoader(train_data, 
-                              batch_size=args.batch_size, 
-                              shuffle=True, 
+    train_loader = DataLoader(train_data,
+                              batch_size=args.batch_size,
+                              shuffle=True,
                               collate_fn=train_data.collate_fn)
-    dev_loader = DataLoader(val_data, 
-                            batch_size=args.batch_size, 
+    dev_loader = DataLoader(val_data,
+                            batch_size=args.batch_size,
                             collate_fn=val_data.collate_fn)
-    test_loader = DataLoader(test_data, 
-                            batch_size=args.batch_size, 
-                            collate_fn=test_data.collate_fn)
+    test_loader = DataLoader(test_data,
+                             batch_size=args.batch_size,
+                             collate_fn=test_data.collate_fn)
 
     model = RecformerForSeqRec(config)
     pretrain_ckpt = torch.load(args.pretrain_ckpt)
@@ -263,15 +267,15 @@ def main():
         print(f'Encoding items.')
         item_embeddings = encode_all_items(model.longformer, tokenizer, tokenized_items, args)
         torch.save(item_embeddings, path_item_embeddings)
-    
+
     item_embeddings = torch.load(path_item_embeddings)
     model.init_item_embedding(item_embeddings)
 
-    model.to(args.device) # send item embeddings to device
+    model.to(args.device)  # send item embeddings to device
 
     num_train_optimization_steps = int(len(train_loader) / args.gradient_accumulation_steps) * args.num_train_epochs
     optimizer, scheduler = create_optimizer_and_scheduler(model, num_train_optimization_steps, args)
-    
+
     if args.fp16:
         scaler = torch.cuda.amp.GradScaler()
     else:
@@ -279,7 +283,7 @@ def main():
 
     test_metrics = eval(model, test_loader, args)
     print(f'Test set: {test_metrics}')
-    
+
     best_target = float('-inf')
     patient = 5
 
@@ -289,7 +293,7 @@ def main():
         model.init_item_embedding(item_embeddings)
 
         train_one_epoch(model, train_loader, optimizer, scheduler, scaler, args)
-        
+
         if (epoch + 1) % args.verbose == 0:
             dev_metrics = eval(model, dev_loader, args)
             print(f'Epoch: {epoch}. Dev set: {dev_metrics}')
@@ -299,12 +303,12 @@ def main():
                 best_target = dev_metrics['NDCG@10']
                 patient = 5
                 torch.save(model.state_dict(), path_ckpt)
-            
+
             else:
                 patient -= 1
                 if patient == 0:
                     break
-    
+
     print('Load best model in stage 1.')
     model.load_state_dict(torch.load(path_ckpt))
 
@@ -313,7 +317,7 @@ def main():
     for epoch in range(args.num_train_epochs):
 
         train_one_epoch(model, train_loader, optimizer, scheduler, scaler, args)
-        
+
         if (epoch + 1) % args.verbose == 0:
             dev_metrics = eval(model, dev_loader, args)
             print(f'Epoch: {epoch}. Dev set: {dev_metrics}')
@@ -323,16 +327,17 @@ def main():
                 best_target = dev_metrics['NDCG@10']
                 patient = 3
                 torch.save(model.state_dict(), path_ckpt)
-            
+
             else:
                 patient -= 1
                 if patient == 0:
                     break
 
-    print('Test with the best checkpoint.')  
+    print('Test with the best checkpoint.')
     model.load_state_dict(torch.load(path_ckpt))
     test_metrics = eval(model, test_loader, args)
     print(f'Test set: {test_metrics}')
-               
+
+
 if __name__ == "__main__":
     main()
