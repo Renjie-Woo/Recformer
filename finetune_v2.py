@@ -60,7 +60,7 @@ def encode_all_items(model, dataloader):
     return item_embeddings
 
 def eval(model, dataloader):
-
+    print('begin eval')
     model.eval()
 
     ranker = Ranker([10,50])
@@ -71,12 +71,12 @@ def eval(model, dataloader):
         # for k, v in batch.items():
         #     batch[k] = v
         # labels = labels
-
+        print('start input')
         with torch.no_grad():
             scores = model(**batch)
-
+        print('finish input & start rank')
         res = ranker(scores, labels)
-
+        print(f'score shape is {scores.shape} and label shape is {labels.shape}')
         metrics = {}
         for i, k in enumerate([10, 50]):
             metrics["NDCG@%d" % k] = res[2*i]
@@ -87,24 +87,26 @@ def eval(model, dataloader):
         for k, v in metrics.items():
             average_meter_set.update(k, v)
 
+        break
+
     average_metrics = average_meter_set.averages()
 
     return average_metrics
 
 
 def train_one_epoch(model, dataloader, optimizer, scheduler, scaler):
-
+    print(f'begin train')
     model.train()
 
     for step, (inputs, labels) in enumerate(tqdm(dataloader, ncols=100, desc='Training')):
-        
 
+        print('start input')
         if fp16:
             with autocast():
                 loss = model(**inputs)
         else:
             loss = model(**inputs)
-
+        print('finish input & start loss')
         if gradient_accumulation_steps > 1:
             loss = loss / gradient_accumulation_steps
 
@@ -131,6 +133,7 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, scaler):
                 scheduler.step()  # Update learning rate schedule
                 optimizer.step()
                 optimizer.zero_grad()
+        break
 
 if __name__ == '__main__':
     train_loader, val_loader, test_loader, meta_loader = generate_dataloader('./dataset/Scientific')

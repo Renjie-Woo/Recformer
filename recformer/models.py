@@ -580,18 +580,23 @@ class RecformerForSeqRec(LongformerPreTrainedModel):
         pooler_output = outputs.pooler_output # (bs, hidden_size)
 
         if labels is None:
+            print('no labels')
             return self.similarity_score(pooler_output, candidates)
-
-        print(f'labels {labels.shape}')
-        print(labels)
+        else:
+            print("has labels")
+            print(f'labels {labels.shape}')
+            print(labels)
 
         loss_fct = CrossEntropyLoss()
 
         if self.config.finetune_negative_sample_size<=0: ## using full softmax
+            print('using full softmax')
             logits = self.similarity_score(pooler_output)
+            print(f'logits shape {logits.shape}')
             loss = loss_fct(logits, labels)
 
         else:  ## using sampled softmax
+            print('using sample softmax')
             candidates = torch.cat((labels.unsqueeze(-1), torch.randint(0, self.config.item_num, size=(batch_size, self.config.finetune_negative_sample_size)).to(labels.device)), dim=-1)
             logits = self.similarity_score(pooler_output, candidates)
             target = torch.zeros_like(labels, device=labels.device)
