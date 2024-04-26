@@ -4,7 +4,7 @@ import torch
 class ItemDataset(Dataset):
 
     def __init__(self, data, tokenizer):
-        self.data = data
+        self.data = [item[1] for item in sorted(data.items(), key=lambda x: x[0])]
         self.tokenizer = tokenizer
         self.len = len(data)
 
