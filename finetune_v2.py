@@ -40,10 +40,10 @@ def generate_dataloader(dir):
     val_dataset = ItemDataset(val_data, tokenizer)
     test_dataset = ItemDataset(test_data, tokenizer)
     meta_dataset = ItemDataset(meta_data, tokenizer)
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=train_dataset.collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=True, collate_fn=val_dataset.collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True, collate_fn=test_dataset.collate_fn)
-    meta_loader = DataLoader(meta_dataset, batch_size=16, shuffle=False, collate_fn=meta_dataset.collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=train_dataset.collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True, collate_fn=val_dataset.collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=test_dataset.collate_fn)
+    meta_loader = DataLoader(meta_dataset, batch_size=32, shuffle=False, collate_fn=meta_dataset.collate_fn)
     return train_loader, val_loader, test_loader, meta_loader
 
 def encode_all_items(model, dataloader):
@@ -51,7 +51,7 @@ def encode_all_items(model, dataloader):
 
     item_embeddings = []
     with torch.no_grad():
-        for _, (inputs, labels) in enumerate(tqdm(dataloader)):  
+        for _, (inputs, labels) in enumerate(tqdm(dataloader)):
             outputs = model(**inputs)
             item_embeddings.append(outputs.pooler_output.detach())
 
@@ -133,12 +133,15 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, scaler):
                 optimizer.zero_grad()
 
 if __name__ == '__main__':
-    train_loader, val_loader, test_loader, meta_loader = generate_dataloader('./dataset/Arts')
+    train_loader, val_loader, test_loader, meta_loader = generate_dataloader('./dataset/Scientific')
 
     #pretrain_ckpt = ""
-
     model = RecformerForSeqRec()
+    ckpt_path = "/home/qcaiaj/workspace/MSBD5002/RecFormer_org/pretrain_ckpt/seqrec_pretrain_ckpt.bin"
+    pretrain_ckpt = torch.load(ckpt_path)
+    model.load_state_dict(pretrain_ckpt, strict=False)
     model = model.to(device)
+
     #pretrain_ckpt = torch.load(pretrain_ckpt)
     #model.load_state_dict(pretrain_ckpt, strict=False)
 
@@ -154,9 +157,9 @@ if __name__ == '__main__':
     #     torch.save(item_embeddings, path_item_embeddings)
     #
     # item_embeddings = torch.load(path_item_embeddings)
-    #item_embeddings = encode_all_items(model.longformer, meta_loader)
-    #torch.save(item_embeddings, './item_embeddings.pt')
-    item_embeddings = torch.load('./item_embeddings.pt')
+    item_embeddings = encode_all_items(model.longformer, meta_loader)
+    torch.save(item_embeddings, './item_embeddings_scientific.pt')
+    #item_embeddings = torch.load('./item_embeddings.pt')
     print('load item embeddings from local')
     model.init_item_embedding(item_embeddings)
 
