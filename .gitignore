@@ -1,6 +1,7 @@
 .idea
 .DS_Store
 /dataset/Arts
+/dataset/Scientific
 /dataset/finetune_data_dataset
 /dataset/__pycache__
 /recformer_v2/__pycache__

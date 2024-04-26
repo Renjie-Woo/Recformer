@@ -95,7 +95,7 @@ def load_data(dir):
     test_final = {}
     test_final_label_id = {}
     for user_id in test_keys:
-        train_seq = train_data[user_id]
+        train_seq = train_data[user_id] + val_data[user_id]
         test_seq = test_data[user_id]
         test_final[user_id] = {
             "input": parse_seq(train_seq, meta_data_with_item_id),
@@ -135,8 +135,35 @@ def parse_seq(item_id_seq, meta_map):
         item_seq.append(meta_map[item_id])
     return item_seq
 
+def data_analysis(dir):
+    # val: 11014, 8007
+    # test: 11014, 8007
+    smap_path = os.path.join(dir, './test.json')
+    smap = sorted(read_json(smap_path, True).keys())
+    wanted = [i for i in range(smap[-1]+1)]
+    miss = set(wanted) - set(smap)
+    print(miss)
+    unmiss = set(smap) - set(wanted)
+    print(unmiss)
+
+def new_data_analysis(dir):
+    meta_path = os.path.join(dir, 'meta.json')
+    item_ids = sorted(read_json(meta_path, True).keys())
+    wanted = [i for i in range(item_ids[-1] + 1)]
+    miss = set(wanted) - set(item_ids)
+    print(miss)
+    unmiss = set(item_ids) - set(wanted)
+    print(unmiss)
+
+
 
 if __name__ == '__main__':
-    # dir = "./finetune_data_dataset/Arts"
+    dir = "./finetune_data_dataset/Scientific"
+    data_analysis(dir)
     # load_data(dir)
-    generate_demo()
+    # generate_demo()
+    # a = read_json('./Scientific/meta.json', True)
+    # a = a.keys()
+
+    #print(8007 in a)
+    #new_data_analysis("./Scientific")

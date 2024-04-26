@@ -5,11 +5,13 @@ class ItemDataset(Dataset):
 
     def __init__(self, data, tokenizer):
         self.data = data
+        self.index = data.keys()
         self.tokenizer = tokenizer
         self.len = len(data)
 
     def __getitem__(self, index):
-        item = self.data[index]
+        item_index = self.index[index]
+        item = self.data[item_index]
         return item
 
     def __len__(self):
