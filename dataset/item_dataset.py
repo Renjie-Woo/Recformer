@@ -2,7 +2,6 @@ from torch.utils.data import Dataset
 import torch
 
 class ItemDataset(Dataset):
-
     def __init__(self, data, tokenizer):
         self.data = data
         self.tokenizer = tokenizer

@@ -133,11 +133,14 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, scaler):
                 optimizer.zero_grad()
 
 if __name__ == '__main__':
-    train_loader, val_loader, test_loader, meta_loader = generate_dataloader('./dataset/Arts')
+    train_loader, val_loader, test_loader, meta_loader = generate_dataloader('./dataset/Scientific')
 
     #pretrain_ckpt = ""
 
     model = RecformerForSeqRec()
+    ckpt_path = ""
+    pretrain_ckpt = torch.load(ckpt_path)
+    model.load_state_dict(pretrain_ckpt, strict=False)
     model = model.to(device)
     #pretrain_ckpt = torch.load(pretrain_ckpt)
     #model.load_state_dict(pretrain_ckpt, strict=False)
@@ -156,6 +159,7 @@ if __name__ == '__main__':
     # item_embeddings = torch.load(path_item_embeddings)
     #item_embeddings = encode_all_items(model.longformer, meta_loader)
     #torch.save(item_embeddings, './item_embeddings.pt')
+
     item_embeddings = torch.load('./item_embeddings.pt')
     print('load item embeddings from local')
     model.init_item_embedding(item_embeddings)

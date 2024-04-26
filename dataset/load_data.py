@@ -22,6 +22,7 @@ def get_train_data(seq, seq_data):
 
 
 def load_data(dir):
+    new_dir = dir.split("/")[-1]
     train_path = os.path.join(dir, "train.json")
     val_path = os.path.join(dir, "val.json")
     test_path = os.path.join(dir, "test.json")
@@ -105,13 +106,14 @@ def load_data(dir):
             "input": parse_seq(train_seq, meta_data_with_item_id),
             "label": test_seq
         }
+    if not os.path.exists(f'./{new_dir}'):
+        os.mkdir(f'./{new_dir}')
 
-
-    save_json(train_final_label_id, "./Arts/train_v1.json")
-    save_json(val_final_label_id, "./Arts/val_v1.json")
-    save_json(test_final_label_id, "./Arts/test_v1.json")
-    save_json(train_final_label, "./Arts/train_with_label.json")
-    save_json(final_meta, "./Arts/meta.json")
+    save_json(train_final_label_id, f"./{new_dir}/train_v1.json")
+    save_json(val_final_label_id, f"./{new_dir}/val_v1.json")
+    save_json(test_final_label_id, f"./{new_dir}/test_v1.json")
+    #save_json(train_final_label, f"./{new_dir}/train_with_label.json")
+    save_json(final_meta, f"./{new_dir}/meta.json")
 
 def generate_demo():
     index_list = [i for i in range(1024)]
@@ -137,6 +139,10 @@ def parse_seq(item_id_seq, meta_map):
 
 
 if __name__ == '__main__':
-    # dir = "./finetune_data_dataset/Arts"
+    # dir = "./finetune_data_dataset/Scientific"
     # load_data(dir)
-    generate_demo()
+    # generate_demo()
+    a = read_json('./Scientific/meta.json', True)
+    a = a.keys()
+
+    print(8007 in a)

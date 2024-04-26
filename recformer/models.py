@@ -582,6 +582,9 @@ class RecformerForSeqRec(LongformerPreTrainedModel):
         if labels is None:
             return self.similarity_score(pooler_output, candidates)
 
+        print(f'labels {labels.shape}')
+        print(labels)
+
         loss_fct = CrossEntropyLoss()
 
         if self.config.finetune_negative_sample_size<=0: ## using full softmax
